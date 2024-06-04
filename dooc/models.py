@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from dooc import nets
-from moltx.models import AdaMR
+from moltx.models import AdaMR2
 from moltx.nets import AbsPosEncoderDecoderConfig
 
 
@@ -11,12 +11,12 @@ class MutSmi(nn.Module):
     def __init__(
         self,
         gene_conf: nets.GeneGNNConfig = nets.GeneGNN.DEFAULT_CONFIG,
-        smiles_conf: AbsPosEncoderDecoderConfig = AdaMR.CONFIG_BASE,
+        smiles_conf: AbsPosEncoderDecoderConfig = AdaMR2.CONFIG_LARGE,
     ) -> None:
         super().__init__()
         self.gene_conf = gene_conf
         self.smiles_conf = smiles_conf
-        self.smiles_encoder = AdaMR(smiles_conf)
+        self.smiles_encoder = AdaMR2(smiles_conf)
 
         self.gene_encoder = nets.GeneGNN(gene_conf)
 
@@ -39,7 +39,7 @@ class MutSmi(nn.Module):
             self.gene_encoder.requires_grad_(False)
 
     def forward(
-        self, smiles_src: torch.Tensor, smiles_tgt: torch.Tensor, gene_src: torch.Tensor
+        self, smiles_tgt: torch.Tensor, gene_src: torch.Tensor
     ) -> torch.Tensor:
         raise NotImplementedError()
 
@@ -52,7 +52,7 @@ class MutSmiXAttention(MutSmi):
         nhead: int = 2,
         num_layers: int = 2,
         gene_conf: nets.GeneGNNConfig = nets.GeneGNN.DEFAULT_CONFIG,
-        smiles_conf: AbsPosEncoderDecoderConfig = AdaMR.CONFIG_BASE,
+        smiles_conf: AbsPosEncoderDecoderConfig = AdaMR2.CONFIG_LARGE,
     ) -> None:
         super().__init__(gene_conf, smiles_conf)
         d_model = self.smiles_conf.d_model
@@ -67,9 +67,9 @@ class MutSmiXAttention(MutSmi):
         )
 
     def forward(
-        self, smiles_src: torch.Tensor, smiles_tgt: torch.Tensor, gene_src: torch.Tensor
+        self, smiles_tgt: torch.Tensor, gene_src: torch.Tensor
     ) -> torch.Tensor:
-        smiles_out = self.smiles_encoder.forward_feature(smiles_src, smiles_tgt).unsqueeze(-2)  # [b, 1, dmodel]
+        smiles_out = self.smiles_encoder.forward_feature(smiles_tgt).unsqueeze(-2)  # [b, 1, dmodel]
         gene_out = self.gene_encoder(gene_src).unsqueeze(-2)  # [b, 1, dmodel]
 
         feat = self.cross_att(smiles_out, gene_out)  # [b, 1, dmodel]
@@ -83,7 +83,7 @@ class MutSmiFullConnection(MutSmi):
     def __init__(
         self,
         gene_conf: nets.GeneGNNConfig = nets.GeneGNN.DEFAULT_CONFIG,
-        smiles_conf: AbsPosEncoderDecoderConfig = AdaMR.CONFIG_BASE,
+        smiles_conf: AbsPosEncoderDecoderConfig = AdaMR2.CONFIG_LARGE,
     ) -> None:
         super().__init__(gene_conf, smiles_conf)
         d_model = self.smiles_conf.d_model
@@ -96,9 +96,9 @@ class MutSmiFullConnection(MutSmi):
         )
 
     def forward(
-        self, smiles_src: torch.Tensor, smiles_tgt: torch.Tensor, gene_src: torch.Tensor
+        self, smiles_tgt: torch.Tensor, gene_src: torch.Tensor
     ) -> torch.Tensor:
-        smiles_out = self.smiles_encoder.forward_feature(smiles_src, smiles_tgt)  # [b, dmodel]
+        smiles_out = self.smiles_encoder.forward_feature(smiles_tgt)  # [b, dmodel]
         gene_out = self.gene_encoder(gene_src)  # [b, dmodel]
         feat = smiles_out + gene_out
 
